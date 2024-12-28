@@ -52,7 +52,7 @@ stow nvim kitty
 
 Just copy the files man..
 
-### Common Error
+## Common Error
 
 If the dotfile already exists then it will cause an error , there are two solution 
 
