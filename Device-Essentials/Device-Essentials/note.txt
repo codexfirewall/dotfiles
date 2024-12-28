@@ -1,0 +1,2 @@
+/etc/systemd is the place you keep ur service
+or use crontab -e and add " @reboot <path> "

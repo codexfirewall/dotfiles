@@ -1,0 +1,15 @@
+[global]
+  
+  monitor = 0
+  follow = mouse 
+  shrink = off
+  transparency = 45
+  separator_height = 2
+  padding = 8
+  horizontal_padding = 8
+  ignore_newline = no
+  frame_width = 3
+  frame_color = #000000aa
+  background = #000000aa
+  font = Hack Nerd Font 12
+  icon_position = off

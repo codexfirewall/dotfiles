@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Exec=exec /etc/init.d/Auto-Tune.sh
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+Name[en_IN]=Auto-Tune
+Name=Auto-Tune
+Comment[en_IN]=Powertop autotune
+Comment=Powertop autotune

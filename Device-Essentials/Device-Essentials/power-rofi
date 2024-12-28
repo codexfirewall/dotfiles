@@ -1,0 +1,14 @@
+#! /bin/sh
+
+chosen=$(printf "Power Off\nRestart\nLock\nTurn On Bluetooth and Pair\nTurn Off Bluetooth\nReconnect Bluetooth" | rofi -dmenu )
+
+case "$chosen" in 
+  "Power Off") systemctl poweroff ;;
+  "Restart" ) systemctl reboot ;;
+  "Lock" ) systemctl suspend && i3lock -c 000000 -fn;;
+  "Log out") i3-msg exit;;
+  "Turn On Bluetooth and Pair" ) bluetoothctl power on && bluetoothctl connect 84:0F:2A:14:BA:B2  ;;
+  "Turn Off Bluetooth" ) bluetoothctl power off ;;
+  "Reconnect Bluetooth") bluetoothctl power off && sleep 1 &&  bluetoothctl power on && bluetoothctl connect 84:0F:2A:14:BA:B2 ;;
+  *) exit 1 ;;
+esac
