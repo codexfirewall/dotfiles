@@ -79,9 +79,10 @@ tiling_drag modifier titlebar
 
 # start a terminal
 bindsym $mod+Return exec kitty
-bindsym $mod+e exec flatpak run io.github.zen_browser.zen
+bindsym $mod+e exec firefox 
 bindsym $mod+z exec --no-startup-id rofi -show drun
 bindsym $mod+shift+z exec --no-startup-id rofi -show window
+bindsym $mod+shift+f exec --no-startup-id rofi -show filebrowser
 # kill focused window
 bindsym $mod+w kill
 bindsym $mod+f exec nautilus
@@ -228,6 +229,8 @@ mode "resize" {
 bindsym $mod2+r mode "resize"
 
 
+#spotify ad block work around
+bindsym $mod2+m exec --no-startup-id ~/Device-Essentials/spotify_restart &
 
 #picom 
 exec_always --no-startup-id picom &
@@ -247,3 +250,5 @@ for_window [title="Calculator"] floating enable
 for_window [class="Spotify"] floating enable , resize set height 900 , resize set width 1100
 #for_window [class="Nautilus"] floating enable , resize set height 850 , resize set width 1100
 for_window [window_role="About"] floating enable
+
+exec_always mpv --no-video ~/Music/startup_sound/windows_xp_startup.mp3 &
