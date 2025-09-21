@@ -1,0 +1,248 @@
+#!/bin/bash
+
+#Default user choices are store in
+# ~/.config/fzf_file_preferences
+
+delay(){
+  sleep 0.78
+}
+
+# Configuration
+PREFERENCES_FILE="$HOME/.config/fzfSearch/filePreferences"
+TEMP_DIR="/tmp/fzf_file_selector"
+
+# Create necessary directories
+mkdir -p "$(dirname "$PREFERENCES_FILE")"
+mkdir -p "$TEMP_DIR"
+
+# Function to get MIME type
+get_mime_type() {
+  local file="$1"
+  file --mime-type -b "$file" 2>/dev/null || echo "application/octet-stream"
+}
+
+# Function to check if application is terminal-based
+is_terminal_app() {
+  local desktop_file="$1"
+  [[ -f "$desktop_file" ]] && grep -q "^Terminal=true" "$desktop_file" 2>/dev/null
+}
+
+# Function to get available applications for a MIME type
+get_applications() {
+  local mime_type="$1"
+  local apps=()
+
+  local search_dirs=(
+    "/usr/share/applications"
+    "$HOME/.local/share/applications"
+    "/usr/local/share/applications"
+    "/var/lib/flatpak/exports/share/applications"
+    "$HOME/.local/share/flatpak/exports/share/applications"
+  )
+
+  for dir in "${search_dirs[@]}"; do
+    [[ ! -d "$dir" ]] && continue
+    while IFS= read -r -d '' desktop_file; do
+      local mime_line
+      mime_line=$(grep "^MimeType=" "$desktop_file" 2>/dev/null)
+      [[ -z "$mime_line" ]] && continue
+      if grep -Fq "$mime_type" <<< "$mime_line" || grep -Fq "${mime_type%%/*}" <<< "$mime_line"; then
+        ! grep -q "^NoDisplay=true" "$desktop_file" 2>/dev/null || continue
+        local app_name
+        app_name=$(grep "^Name=" "$desktop_file" 2>/dev/null | head -1 | cut -d'=' -f2)
+        [[ -n "$app_name" ]] && apps+=("$app_name|$(basename "$desktop_file")")
+      fi
+    done < <(find "$dir" -maxdepth 1 -name "*.desktop" -print0 2>/dev/null)
+  done
+
+  # Read additional hardcoded apps from your config file if it exists
+  local hardcoded_file="$HOME/.config/fzfSearch/default"
+  if [[ -f "$hardcoded_file" ]]; then
+    while IFS= read -r line; do
+      # Skip empty lines and comments
+      [[ -z "$line" || "$line" =~ ^# ]] && continue
+      # line format assumed to be "App Name|desktop-file-name"
+      if ! printf '%s\n' "${apps[@]}" | grep -qxF "$line"; then
+        apps+=("$line")
+      fi
+    done < "$hardcoded_file"
+  fi
+
+  printf '%s\n' "${apps[@]}" | sort -u | head -20
+}
+
+
+# Function to load user preference
+load_preference() {
+  local mime_type="$1"
+  if [[ -f "$PREFERENCES_FILE" ]]; then
+    grep "^$mime_type:" "$PREFERENCES_FILE" | cut -d':' -f2
+  fi
+}
+
+# Function to save user preference
+save_preference() {
+  local mime_type="$1"
+  local app_choice="$2"
+  
+  # Remove existing preference for this MIME type
+  if [[ -f "$PREFERENCES_FILE" ]]; then
+    grep -v "^$mime_type:" "$PREFERENCES_FILE" > "$TEMP_DIR/prefs_temp" 2>/dev/null
+    mv "$TEMP_DIR/prefs_temp" "$PREFERENCES_FILE"
+  fi
+  
+  # Add new preference
+  echo "$mime_type:$app_choice" >> "$PREFERENCES_FILE"
+}
+
+# Function to select application
+select_application() {
+  local mime_type="$1"
+  local file="$2"
+  
+  # Check for saved preference
+  local saved_pref=$(load_preference "$mime_type")
+  if [[ -n "$saved_pref" ]]; then
+    echo "$saved_pref"
+    return 0
+  fi
+  
+  # Get available applications
+  local apps=$(get_applications "$mime_type")
+  
+  if [[ -z "$apps" ]]; then
+    printf "No applications found for MIME type: %s\n" "$mime_type" >&2
+    return 1
+  fi
+  
+  # Count applications
+  local app_count=$(echo "$apps" | wc -l)
+  
+  if [[ $app_count -eq 1 ]]; then
+    # Only one application available
+    echo "$apps" | cut -d'|' -f2
+    return 0
+  fi
+  
+  # Multiple applications found - display all info at once
+  {
+    echo ""
+    echo "Multiple applications can open this file:"
+    echo "File: $(basename "$file")"
+    echo "Type: $mime_type"
+    echo ""
+    echo "Select application:"
+    
+    # Display application list
+    local i=1
+    local app_list=()
+    while IFS= read -r app; do
+      if [[ -n "$app" ]]; then
+        local app_name=$(echo "$app" | cut -d'|' -f1)
+        local app_file=$(echo "$app" | cut -d'|' -f2)
+        echo "$i: $app_name"
+        app_list+=("$app_file")
+        ((i++))
+      fi
+    done <<< "$apps"
+    
+    echo ""
+    echo "Options:"
+    echo "  1-$app_count: Select application"
+    echo "  r: Remember choice for this file type"
+    echo "  o: Open once without saving"
+    echo ""
+  } >&2
+  
+  printf "Choice: " >&2
+  read choice
+  
+  case "$choice" in
+    "r")
+      printf "\nSelect application to remember (1-$app_count): " >&2
+      read app_choice
+      if [[ "$app_choice" -ge 1 && "$app_choice" -le $app_count ]] 2>/dev/null; then
+        local selected_app="${app_list[$((app_choice-1))]}"
+        save_preference "$mime_type" "$selected_app"
+        printf "Preference saved for %s files!\n" "$mime_type" >&2
+        echo "$selected_app"
+        return 0
+      else
+        printf "Invalid choice.\n" >&2
+        return 1
+      fi
+      ;;
+    "o")
+      printf "\nSelect application (1-$app_count): " >&2
+      read app_choice
+      if [[ "$app_choice" -ge 1 && "$app_choice" -le $app_count ]] 2>/dev/null; then
+        local selected_app="${app_list[$((app_choice-1))]}"
+        echo "$selected_app"
+        return 0
+      else
+        printf "Invalid choice.\n" >&2
+        return 1
+      fi
+      ;;
+    *)
+      if [[ "$choice" -ge 1 && "$choice" -le $app_count ]] 2>/dev/null; then
+        local selected_app="${app_list[$((choice-1))]}"
+        echo "$selected_app"
+        return 0
+      else
+        printf "Invalid choice. Please enter 1-%d, 'r', or 'o'.\n" "$app_count" >&2
+        return 1
+      fi
+      ;;
+  esac
+}
+
+# Function to open file
+open_file() {
+  local file="$1"
+  local app="$2"
+  # Use gtk-launch for all apps; let the desktop environment/DE handle details.
+  printf "Opening '%s' with %s\n" "$file" "$app" >&2
+  setsid gtk-launch "$app" "$file" >/dev/null 2>&1 < /dev/null &
+}
+
+
+# Main execution
+main() {
+  #local selected_file=$(fzf)
+
+  mapfile -t lines < <(
+    fzf --expect=enter,alt-enter
+  )
+
+  key="${lines[0]}"
+  selected_file="${lines[1]}"
+
+  if [[ "$key" == "alt-enter" ]]; then
+    open_file "$selected_file" org.gnome.Nautilus.desktop
+    delay
+    exit 0
+  fi
+  
+  if [[ -n "$selected_file" ]]; then
+    if [[ ! -r "$selected_file" ]]; then
+      printf "Error: Cannot read file '%s'\n" "$selected_file" >&2
+      exit 1
+    fi
+    
+    local mime_type=$(get_mime_type "$selected_file")
+    local selected_app=$(select_application "$mime_type" "$selected_file")
+
+    if [[ $? -eq 0 ]]; then
+      open_file "$selected_file" "$selected_app"
+    else
+      printf "Using system default handler\n" >&2
+      setsid xdg-open "$selected_file" >/dev/null 2>&1 < /dev/null &
+    fi
+    
+  fi
+}
+
+main
+delay
+exit 0
