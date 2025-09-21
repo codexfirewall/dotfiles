@@ -32,6 +32,11 @@ exec --no-startup-id dex --autostart --environment i3
 #exec xset dpms 1800 0 0 
 exec_always --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -c 000000 --nofork &
 
+#battery warning service 
+# Run the battery check script in a loop
+exec --no-startup-id bash -c 'while sleep 150; do /home/ssp-deb/Device-Essentials/battery_check.sh; done'
+
+
 # auto lock the screen
 #exec "xautolock -detectsleep -time 3 -locker \"i3lock -c 000000\""
 
@@ -79,10 +84,16 @@ tiling_drag modifier titlebar
 
 # start a terminal
 bindsym $mod+Return exec kitty
-bindsym $mod+e exec firefox 
+bindsym $mod+e exec flatpak run app.zen_browser.zen 
 bindsym $mod+z exec --no-startup-id rofi -show drun
 bindsym $mod+shift+z exec --no-startup-id rofi -show window
-bindsym $mod+shift+f exec --no-startup-id rofi -show filebrowser
+
+bindsym $mod+Shift+f exec --no-startup-id kitty --class fzf_window fzfs 
+
+#bindsym $mod+Shift+f exec --no-startup-id kitty --class fzf_window -o initial_window_width=120c -o initial_window_height=120c sh -c 'xdg-open "$(fzf)" 2>/dev/null'
+#bindsym $mod+shift+f exec --no-startup-id rofi -show filebrowser
+#bindsym $mod+Shift+f exec fzf 
+
 # kill focused window
 bindsym $mod+w kill
 bindsym $mod+f exec nautilus
@@ -248,7 +259,13 @@ exec_always ~/.config/polybar/launch.sh &
 #auto toggle floating 
 for_window [title="Calculator"] floating enable
 for_window [class="Spotify"] floating enable , resize set height 900 , resize set width 1100
+
+for_window [class="ZapZap"] floating enable , resize set height 900 , resize set width 1100
+
+for_window [class="fzf_window"] floating enable , resize set height 900 , resize set width 1100 , move position center
+
 #for_window [class="Nautilus"] floating enable , resize set height 850 , resize set width 1100
 for_window [window_role="About"] floating enable
+for_window [window_role="Signin"] floating enable
 
 exec_always mpv --no-video ~/Music/startup_sound/windows_xp_startup.mp3 &
